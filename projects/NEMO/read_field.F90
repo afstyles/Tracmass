@@ -36,7 +36,7 @@ SUBROUTINE read_field
 
    INTEGER        :: kk, itrac
 
-   REAL(DP), ALLOCATABLE, DIMENSION(:,:,:)  :: tmp3d
+   REAL(TP), ALLOCATABLE, DIMENSION(:,:,:)  :: tmp3d                   !Formerly DP
    CHARACTER (len=200)                      :: fieldFile, dateprefix
 
    ! Reassign the time index of uflux and vflux, dzt, dzdt, hs, ...

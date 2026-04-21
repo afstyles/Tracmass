@@ -97,7 +97,11 @@ MODULE mod_tracers
     ! --------------------------------------------------
 
        CHARACTER(len=100)          :: tracname
-       REAL(DP), DIMENSION(:,:,:)  :: var3d
+       REAL(TP), DIMENSION(:,:,:)  :: var3d                           !Formerly DP
+      !  REAL(DP), DIMENSION(SIZE(var3d,1),SIZE(var3d,2)) :: var2d
+       INTEGER :: iksurf, ik
+
+       iksurf = km - 7
 
        ! Sigma 0 calculation (using T (degC) and S(g/kg))
        IF (TRIM(tracname) == 'sigma0') THEN
@@ -107,10 +111,40 @@ MODULE mod_tracers
        ELSE IF (TRIM(tracname) == 'sigma0_K') THEN
              var3d = REAL(thermo_dens0(REAL(tracers(1)%data(:,:,:,2),4)-273.15, REAL(tracers(2)%data(:,:,:,2),4)),8)
              var3d = var3d - 1000.d0
+       ! TEOS-10 Sigma 0 calculation (using Conservative T [degC] and Absolute Salinity [g/kg])
+       ELSE IF  (TRIM(tracname) == 'sigma0_teos') THEN
+             var3d = REAL( thermo_dens0_teos10(REAL(tracers(1)%data(:,:,:,2),4), REAL(tracers(2)%data(:,:,:,2),4)),8)
+             var3d = var3d - 1000.d0
        ! Conservative temperatue (CTo) calculation (using T (degC) and S(g/kg))
        ELSE IF (TRIM(tracname) == 'CTo') THEN
              var3d = REAL(thermo_pt2ct(REAL(tracers(1)%data(:,:,:,2),4), REAL(tracers(2)%data(:,:,:,2),4)),8)
+
+       ! Difference between parcel density and density at 10m depth
+       ELSE IF (TRIM(tracname) == 'sigma10diff') THEN
+             var3d = REAL(tracers(3)%data(:,:,:,2),8)             
+             !var3d = REAL(thermo_dens0(REAL(tracers(1)%data(:,:,:,2),4), REAL(tracers(2)%data(:,:,:,2),4)),8) 
+             !
+             DO ik = 1,km
+                IF (.NOT.(ik == iksurf)) THEN 
+                   var3d(:,:,ik) = var3d(:,:,ik) - var3d(:,:,iksurf)
+                END IF
+             END DO
+             !
+             var3d(:,:,iksurf) = 0.
        END IF
+
+      !  ! Difference between parcel density and density at 10m depth (if density is not calculated)
+      !   ELSE IF (TRIM(tracname) == 'sigma10diff') THEN
+      !         var3d = REAL(thermo_dens0(REAL(tracers(1)%data(:,:,:,2),4), REAL(tracers(2)%data(:,:,:,2),4)),4)
+      !         !
+      !         DO ik = 1,km
+      !            IF (.NOT.(ik == iksurf)) THEN 
+      !               var3d(:,:,ik) = var3d(:,:,ik) - var3d(:,:,iksurf)
+      !            END IF
+      !         END DO
+      !         !
+      !         var3d(:,:,iksurf) = 0.
+      !   END IF
 
     END SUBROUTINE compute_tracer
 
@@ -174,7 +208,7 @@ MODULE mod_tracers
     !
     ! --------------------------------------------------
 
-      REAL(DP)             :: tracvalue
+      REAL(TP)             :: tracvalue     !Formerly DP
       INTEGER, INTENT(IN)  :: itrac
 
       INTEGER              :: indexm

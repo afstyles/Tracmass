@@ -17,7 +17,7 @@ MODULE mod_seed
     !!------------------------------------------------------------------------------
 
     USE mod_log,  only            : log_level
-    USE mod_grid, only            : imt, jmt, km, kmt, nsm, mask, dzt, griddir
+    USE mod_grid, only            : imt, jmt, km, kmt, nsm, mask, dzt, griddir, dxdy
     USE mod_time, only            : ints, tseas, tt, ts, nff
     USE mod_vel,  only            : uflux, vflux, wflux
     USE mod_loopvars, only        : subvol
@@ -38,17 +38,22 @@ MODULE mod_seed
     INTEGER                                    :: num, itrac
     INTEGER                                    :: iist, ijst, ikst, iistp
     INTEGER                                    :: ijt,  ikt,  jjt, jkt
-    INTEGER                                    :: ji, jii, jj, jjj, jk, jsd
+    INTEGER                                    :: j, ji, jii, jj, jjj, jk, jsd, jsample
     INTEGER                                    :: ktracer
     INTEGER                                    :: filestat
     INTEGER                                    :: numsd, landsd=0
-    INTEGER                                    :: nsdTim, nsdMax, ntracmax
+    INTEGER                                    :: nsdTim, nsdMax, ntracmax, nsampleMax, nsample
+    INTEGER                                    :: ntracmax_xy
     INTEGER                                    :: itim
 
     INTEGER, ALLOCATABLE, DIMENSION(:,:)       :: seed_ijk, seed_set
     INTEGER, ALLOCATABLE, DIMENSION(:)         :: seed_tim
+    LOGICAL, ALLOCATABLE, DIMENSION(:)         :: subsample_mask
+    LOGICAL                                    :: jsubsample_mask
+    REAL(DP)                                   :: irandom
 
     CHARACTER(LEN=200)                         :: fullSeedFile
+    CHARACTER(LEN=200)                         :: fullSubsampleFile
 
     CHARACTER(LEN=*), PARAMETER                :: timform = "(i12)"
     CHARACTER(LEN=*), PARAMETER                :: ijkform = "(6i6)"
@@ -123,13 +128,14 @@ MODULE mod_seed
                 PRINT '(A,I7,A,I7)', '        kst1 : ', kst1, '   kst2 : ', kst2
             END IF
 
-        CASE (2)      ! Seed particles according to indices given in a list
+        CASE (2:)      ! Seed particles according to indices given in a list
 
             fullSeedFile=trim(seedDir) // trim(seedFile)
             IF (log_level>0) PRINT *,'Particles are seeded from a given listfile  '
 
-            ! Test if file exists, and read it if it does
+            ! Test if seedfile exists, and read it if it does
             INQUIRE (FILE = fullSeedFile, exist=fileexists)
+
             IF (fileexists) THEN
 
                 nsdMax=0
@@ -271,8 +277,90 @@ MODULE mod_seed
             ! Allocate trajectories
             IF (nqua == 1) THEN
                 ntracmax = nsdMax*nsdTim*INT(partQuant)
+                ntracmax_xy = nsdMax*INT(partQuant)
             ELSE
-                ntracmax = nsdMax*nsdTim*10000
+                ! ntracmax = nsdMax*nsdTim*10000   !A. Styles - Just randomly assume 10,000 trajectories per cell???
+                ntracmax = nsdMax*nsdTim*nsdPerCellAvg  !A. Styles - Use a namelist for an average number of trajectories per cell.
+                ntracmax_xy = nsdMax*nsdPerCellAvg  !A. Styles - Use a namelist for an average number of trajectories per cell.
+            END IF
+
+            ! A. Styles - Determine effect of subsampling before allocating trajectory array
+            IF (seedtype == 3) THEN
+
+                fullSubsampleFile = trim(seedDir) // trim(subsampleFile)
+                IF (log_level>0) PRINT *,'Particles are subsampled from a given listfile  '
+
+                ! Test if subsamplefile exists, and read it if it does
+                INQUIRE (FILE = fullSubsampleFile, exist=fileexists)
+
+                IF (fileexists) THEN            
+
+                    ! Determine record length of subsample file (nsampleMax) --------
+                    nsampleMax=0
+                    OPEN(unit=47,file=fullSubsampleFile, ACCESS = 'SEQUENTIAL', &
+                        FORM = 'FORMATTED', ACTION = 'READ')
+
+                    findmaxsamples: DO
+                    READ (UNIT=47, fmt=*,iostat=filestat)
+                    IF (filestat < 0) THEN
+                        EXIT findmaxsamples
+                    END IF
+                    nsampleMax = nsampleMax + 1
+                    END DO findmaxsamples
+
+                    REWIND (47)
+
+                    ! Test that record length is sufficient
+                    IF (nsampleMax < ntracmax_xy) THEN
+                        PRINT *,'-----------------------------------------------------'
+                        PRINT *,'*** ERROR!                                        ***'
+                        PRINT *,'*** Subsample file shorter than max trajectories  ***'
+                        PRINT *,'*** for a given seeding timestep (ntracmax_xy)    ***'
+                        PRINT *,'File name    : '//trim(fullSubsampleFile)
+                        PRINT *,'*** Run terminated.                               ***'
+                        STOP
+                    END IF
+
+                    ! Determine number of sampled trajectories (nsample) -------------
+                    ! and load the random numbers from the file to create a mask -----
+                    nsample = 0
+                    ALLOCATE( subsample_mask(ntracmax_xy) )
+
+                    DO j = 1,ntracmax_xy
+                        READ (UNIT=47, fmt=*,iostat=filestat) irandom
+                        ! PRINT *, 'irandom = ', irandom, ' (j=',j,')'
+                        IF ( irandom <= subsampleRate) THEN
+                            nsample = nsample + 1
+                            subsample_mask(j) = .TRUE.
+                        ELSE
+                            subsample_mask(j) = .FALSE.
+                        END IF
+                    END DO 
+                    CLOSE (34)
+
+                    PRINT *, '-------------------------------------------'
+                    PRINT *, 'SUBSAMPLING'
+                    PRINT *, 'Sampling a maximum of ',nsample,' trajectories'
+                    PRINT *, 'Out of a maximum of ',ntracmax_xy,' trajectories'
+                    PRINT *, '(per seeding time step)'
+                    PRINT *, 'Subsampling rate ',subsampleRate
+
+                    ntracmax = nsample * nsdTim
+
+
+
+                    IF (log_level>0)  PRINT *,'   File name   : '//trim(fullSubsampleFile)
+                ELSE
+
+                PRINT *,'-----------------------------------------------------'
+                PRINT *,'*** ERROR!                                        ***'
+                PRINT *,'*** Subsample file does not exist                ***'
+                PRINT *,'File name    : '//trim(fullSubsampleFile)
+                PRINT *,'*** Run terminated.                               ***'
+                STOP
+
+                END IF
+
             END IF
 
             ALLOCATE ( trajectories(ntracmax) )
@@ -326,7 +414,9 @@ MODULE mod_seed
                  END IF
               END DO findTime
 
-              !Loop over the seed size (nsdMax)
+              !Loop over the spatial seed  locations (nsdMax)
+              jsample = 0
+
               startLoop: DO jsd=1,nsdMax
 
                  IF ( (seedTime == 1 .OR. seedTime == 2) .AND. &
@@ -407,8 +497,12 @@ MODULE mod_seed
                       END IF
 
                   CASE (3) ! particle reflects air/water mass/volume at seeding
-                      vol = dzt(ib,jb,kb,1)
-                      num = INT(vol/partQuant)
+                      !vol = dzt(ib,jb,kb,1)     ! Comment by A.Styles vvv (23rd February)
+                      !num = INT(vol/partQuant)  ! This seems to divide the cell up based on cell height, not volume as suggested in the namelist
+                      vol = dxdy(ib,jb) * dzt(ib,jb,kb,1)
+                      num = CEILING(vol/partQuant)
+
+
                   END SELECT
 
                   IF (num == 0)  num = 1
@@ -527,67 +621,82 @@ MODULE mod_seed
                             END DO
                         END IF
 
-                        ! Update trajectory numbers
-                        ntractot = ntractot + 1
-                        ntrac = ntractot
+                        ! This is the point where the subsampling should be applied !
+                        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-                        ! Only one particle for diagnistics purposes
-                        IF ((loneparticle>0) .and. (ntrac.ne.loneparticle)) THEN
-                          trajectories(ntrac)%active = .FALSE.
-                          CYCLE kkkLoop
+                        jsample = jsample + 1
+
+                        IF (seedType == 3) THEN
+                            jsubsample_mask = subsample_mask(jsample)
+                        ELSE
+                            jsubsample_mask = .TRUE.
                         END IF
 
-                        ! Rerun/streamfunction options
-                        IF ((l_rerun .EQV..TRUE.) .AND. (trajectories(ntrac)%lbas==-1)) THEN
-                          trajectories(ntrac)%active = .FALSE.
-                          CYCLE kkkLoop
+
+                        IF (jsubsample_mask) THEN
+
+                            ! Update trajectory numbers (seedType=3, if part of subsample)
+                            ntractot = ntractot + 1
+                            ntrac = ntractot
+
+                            ! Only one particle for diagnistics purposes
+                            IF ((loneparticle>0) .and. (ntrac.ne.loneparticle)) THEN
+                            trajectories(ntrac)%active = .FALSE.
+                            CYCLE kkkLoop
+                            END IF
+
+                            ! Rerun/streamfunction options
+                            IF ((l_rerun .EQV..TRUE.) .AND. (trajectories(ntrac)%lbas==-1)) THEN
+                            trajectories(ntrac)%active = .FALSE.
+                            CYCLE kkkLoop
+                            END IF
+
+                            ! tt - time, fractions of ints
+                            ! ts - time [s] rel to start
+                            ts  = DBLE (ints-1)
+                            tt  = ts * tseas
+                            tss = 0.d0
+
+                            ! Define the trajectories
+                            trajectories(ntrac)%x1 = x1
+                            trajectories(ntrac)%y1 = y1
+                            trajectories(ntrac)%z1 = z1
+                            trajectories(ntrac)%tt = tt
+                            trajectories(ntrac)%subvol = subvol
+                            trajectories(ntrac)%t0 = tt
+
+                            trajectories(ntrac)%ib = ib
+                            trajectories(ntrac)%jb = jb
+                            trajectories(ntrac)%kb = kb
+                            trajectories(ntrac)%niter = 0
+                            trajectories(ntrac)%nts = IDINT(ts)
+                            trajectories(ntrac)%icycle = 1
+
+                            ! Tracer definition
+                            IF (l_tracers) THEN
+                                ALLOCATE(trajectories(ntrac)%tracerval(numtracers))
+                                trajectories(ntrac)%tracerval(:) = tracervalue
+                            END IF
+
+                            ! Define the direction of the trajectory
+                            trajdir(:) = 0; trajdir(isec) = nff*idir
+
+                            ! Boxface
+                            IF (isec ==1 .AND. nff*idir>0) boxface = 1
+                            IF (isec ==1 .AND. nff*idir<0) boxface = 2
+                            IF (isec ==2 .AND. nff*idir>0) boxface = 3
+                            IF (isec ==2 .AND. nff*idir<0) boxface = 4
+                            IF (isec ==3 .AND. nff*idir>0) boxface = 5
+                            IF (isec ==3 .AND. nff*idir<0) boxface = 6
+
+                            !Save initial particle position
+                            IF(log_level >= 3) THEN
+                            PRINT*,' write initial trajectory position '
+                            END IF
+
+                            CALL write_data('ini')
+                            CALL write_data('run')
                         END IF
-
-                        ! tt - time, fractions of ints
-                        ! ts - time [s] rel to start
-                        ts  = DBLE (ints-1)
-                        tt  = ts * tseas
-                        tss = 0.d0
-
-                        ! Define the trajectories
-                        trajectories(ntrac)%x1 = x1
-                        trajectories(ntrac)%y1 = y1
-                        trajectories(ntrac)%z1 = z1
-                        trajectories(ntrac)%tt = tt
-                        trajectories(ntrac)%subvol = subvol
-                        trajectories(ntrac)%t0 = tt
-
-                        trajectories(ntrac)%ib = ib
-                        trajectories(ntrac)%jb = jb
-                        trajectories(ntrac)%kb = kb
-                        trajectories(ntrac)%niter = 0
-                        trajectories(ntrac)%nts = IDINT(ts)
-                        trajectories(ntrac)%icycle = 1
-
-                        ! Tracer definition
-                        IF (l_tracers) THEN
-                            ALLOCATE(trajectories(ntrac)%tracerval(numtracers))
-                            trajectories(ntrac)%tracerval(:) = tracervalue
-                        END IF
-
-                        ! Define the direction of the trajectory
-                        trajdir(:) = 0; trajdir(isec) = nff*idir
-
-                        ! Boxface
-                        IF (isec ==1 .AND. nff*idir>0) boxface = 1
-                        IF (isec ==1 .AND. nff*idir<0) boxface = 2
-                        IF (isec ==2 .AND. nff*idir>0) boxface = 3
-                        IF (isec ==2 .AND. nff*idir<0) boxface = 4
-                        IF (isec ==3 .AND. nff*idir>0) boxface = 5
-                        IF (isec ==3 .AND. nff*idir<0) boxface = 6
-
-                        !Save initial particle position
-                        IF(log_level >= 3) THEN
-                           PRINT*,' write initial trajectory position '
-                        END IF
-
-                        CALL write_data('ini')
-                        CALL write_data('run')
 
                       END DO kkkLoop
                     END DO ijjLoop

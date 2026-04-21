@@ -28,6 +28,7 @@
 
 ! Precision definitions
 MODULE mod_precdef
+   INTEGER, PARAMETER                       :: TP = selected_real_kind(6,   37)
    INTEGER, PARAMETER                       :: PP = selected_real_kind(6 ,  37)
    INTEGER, PARAMETER                       :: DP = selected_real_kind(15, 307)
    INTEGER, PARAMETER                       :: QP = selected_real_kind(33, 4931)
@@ -53,6 +54,7 @@ MODULE mod_param
   INTEGER                                   :: iter       ! Number of subcycles
   INTEGER                                   :: ngcm       ! Time step in hours
   INTEGER                                   :: ngcm_step  ! Size of the time step
+  LOGICAL                                   :: single_tcount !Single time index per file (typical for uncombined data)
   INTEGER                                   :: ngcm_unit  ! Unit of the time step
 
   REAL(DP), PARAMETER                       :: UNDEF=1.d20
@@ -86,11 +88,15 @@ MODULE mod_seedvars
   INTEGER                                    :: tst1, tst2   ! Seeding time
 
   INTEGER                                    :: seedType, seedTime
+  INTEGER                                    :: nsdPerCellAvg ! If nqua=2 or 3, expected average number of 
+                                                              ! trajectories per cell (ignoring time)
 
   CHARACTER(LEN=200)                         :: seedDir       ! Directory where seed files are stored
   CHARACTER(LEN=200)                         :: seedFile      ! space seed file
   CHARACTER(LEN=200)                         :: maskFile =' ' ! mask file
   CHARACTER(LEN=200)                         :: timeFile      ! time seed file
+  CHARACTER(LEN=200)                         :: subsampleFile ! subsampling file
+  REAL(DP)                                   :: subsampleRate ! rate of subsampling
 
 END MODULE mod_seedvars
 
@@ -109,7 +115,7 @@ MODULE mod_trajdef
       REAL(DP)                              :: x0,y0,z0,x1,y1,z1  !! positions
       REAL(DP)                              :: tt,t0              !! time
       REAL(DP)                              :: subvol             !! volume (or mass for atm.)
-      REAL(DP),DIMENSION(:), ALLOCATABLE    :: tracerval
+      REAL(TP),DIMENSION(:), ALLOCATABLE    :: tracerval          !! Formerly DP
 
       LOGICAL                               :: active             !! particle active or not
    END TYPE trajectory
@@ -358,7 +364,7 @@ MODULE mod_tracerdef
       CHARACTER(len=100)                    :: varname            !! Name of the variable
       CHARACTER(len=2)                      :: dimension          !! 2D/3D tracer
 
-      REAL(DP), DIMENSION(:,:,:,:), ALLOCATABLE :: data           !! Data tracer
+      REAL(TP), DIMENSION(:,:,:,:), ALLOCATABLE :: data           !! Data tracer (Formerly DP)
     END TYPE tracer
 END MODULE mod_tracerdef
 
@@ -381,16 +387,16 @@ MODULE mod_tracervars
 
   CHARACTER(len=2), DIMENSION(10)     :: tracerdimension = '3D'
 
-  REAL(DP), DIMENSION(10)             :: tracermin, tracermax, &
+  REAL(TP), DIMENSION(10)             :: tracermin, tracermax, &      !Formerly DP
                                          tracer0min=-9999.d0, tracer0max=9999.d0, &
                                          tracershift=0.d0, tracerscale=1.d0, &
                                          tracere
-  REAL(DP), DIMENSION(:), ALLOCATABLE :: tracervalue
+  REAL(TP), DIMENSION(:), ALLOCATABLE :: tracervalue                   !Formerly DP
 
   ! Tracer resolution
   INTEGER     :: resolution = 501
 
-  REAL(DP), DIMENSION(:), ALLOCATABLE   :: dtracervalue
+  REAL(TP), DIMENSION(:), ALLOCATABLE   :: dtracervalue                 !Formerly DP
   INTEGER, DIMENSION(:,:), ALLOCATABLE  :: tracerbinvalue
 
   ! Particle arrays
@@ -399,8 +405,8 @@ MODULE mod_tracervars
 
   ! Salt/water trajectories
   LOGICAL                                     :: l_swtraj = .FALSE.
-  REAL(DP), DIMENSION(:,:,:,:), ALLOCATABLE   :: tracertraj
-  REAL(DP)                                    :: tracertrajscale = 1.d0
+  REAL(TP), DIMENSION(:,:,:,:), ALLOCATABLE   :: tracertraj              !Formerly DP
+  REAL(TP)                                    :: tracertrajscale = 1.d0  !Formerly DP
 
 
 END MODULE mod_tracervars
@@ -464,7 +470,7 @@ MODULE mod_postprocessvars
   REAL(DP)                                :: voltot = 0
 
   ! Temporary trajectory information
-  REAL(DP), DIMENSION(:,:,:), ALLOCATABLE   :: traj_t
+  REAL(TP), DIMENSION(:,:,:), ALLOCATABLE   :: traj_t                    !Formerly DP
   REAL(DP), DIMENSION(:,:), ALLOCATABLE     :: traj_x, traj_y, traj_z
   REAL(DP), DIMENSION(:), ALLOCATABLE       :: traj_subvol
   INTEGER, DIMENSION(:), ALLOCATABLE        :: traj_out

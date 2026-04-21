@@ -50,7 +50,7 @@ MODULE mod_init
                                            zgridFile, dzt_name, dzu_name, dzv_name, dep_name,&
                                            bathyFile, kmt_name
           namelist /INIT_GRID_SUBDOMAIN/   l_subdom, imindom, imaxdom, jmindom, jmaxdom
-          namelist /INIT_GRID_TIME/        ngcm_step, ngcm_unit, iter
+          namelist /INIT_GRID_TIME/        ngcm_step, ngcm_unit, iter, single_tcount
           namelist /INIT_START_DATE/       startSec, startMin, startHour,           &
                                            startDay, startMon, startYear,           &
                                            noleap, mon30day
@@ -58,9 +58,10 @@ MODULE mod_init
                                            log_level, intrun
           namelist /INIT_WRITE_TRAJ/       write_frec, write_form, outDataDir, outDataFile, timeformat, l_compress
           namelist /INIT_SEEDING/          nff, isec, idir, nqua, partQuant,             &
-                                           loneparticle, SeedType, ist1,  &
-                                           ist2, jst1, jst2, kst1, kst2, tst1, tst2,&
-                                           seedDir, seedFile, maskFile, seedTime, timeFile
+                                           loneparticle, SeedType, nsdPerCellAvg, ist1,  &
+                                           ist2, jst1, jst2, kst1, kst2, tst1, tst2,     &
+                                           seedDir, seedFile, maskFile, seedTime, timeFile, &
+                                           subsampleFile, subsampleRate 
           namelist /INIT_TRACERS/          l_tracers, l_swtraj, tracertrajscale, &
                                            tracername, tracershift, tracerscale, &
                                            tracerunit, tracervarname,&
@@ -74,7 +75,12 @@ MODULE mod_init
           namelist /INIT_ACTIVE/           l_diffusion, ah, av
 
           ! Read namelist
-          OPEN (8,file='namelist.in',    &
+          !          OPEN (8,file='namelist.in',    &
+
+          Project = PROJECT_NAME
+          Case = CASE_NAME          
+
+          OPEN(8,file='projects/'//Trim(Project)//'/namelist_'//Trim(Case)//'.in', &     
                & status='OLD', delim='APOSTROPHE')
           READ (8,nml=INIT_GRID_DESCRIPTION)
           READ (8,nml=INIT_GRID_SIZE)

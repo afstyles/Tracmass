@@ -23,6 +23,7 @@ MODULE mod_getfile
   USE mod_log
   USE netcdf
   USE mod_time
+  USE mod_param, only: single_tcount 
 
   IMPLICIT NONE
 
@@ -171,10 +172,18 @@ MODULE mod_getfile
           IF (stcase == 'st') THEN
              ss = start2D
              cc = count2D
+
           ELSE IF (stcase == 'st_r') THEN
              ss(1) = start2D(2); ss(2) = start2D(1); ss(3) = start2D(3); ss(4) = start2D(4)
              cc(1) = count2D(2); cc(2) = count2D(1); cc(3) = count2D(3); cc(4) = count2D(4)
           END IF
+
+          !Added by Andrew Styles
+          IF(single_tcount) THEN
+            ss(3) = 1 
+            cc(3) = 1
+          END IF
+          
 
           ierr=NF90_OPEN(TRIM(fieldFile) ,NF90_NOWRITE ,ncid)
           IF(ierr .NE. 0) CALL error_getfieldNC(1,fieldFile,varName)
@@ -198,7 +207,6 @@ MODULE mod_getfile
           ELSE
               ierr=NF90_GET_VAR(ncid ,varid ,field, ss, cc )
           END IF
-
           IF(ierr .NE. 0) CALL error_getfieldNC(3,fieldFile,varName)
 
           ierr = NF90_GET_ATT(ncid, varid,"scale_factor", scale_factor)
@@ -260,6 +268,15 @@ MODULE mod_getfile
            ELSE IF (stcase == 'ts_r') THEN
               ss(1) = start3D(4); ss(2) = start3D(3); ss(3) = start3D(2); ss(4) = start3D(1)
               cc(1) = count3D(4); cc(2) = count3D(3); cc(3) = count3D(2); cc(4) = count3D(1)
+           END IF
+
+         !Added by Andrew Styles
+           IF((single_tcount).AND.((stcase == "ts").OR.(stcase == "ts_r"))) THEN
+             ss(1) = 1 
+             cc(1) = 1
+           ELSE 
+             ss(4) = 1
+             cc(4) = 1
            END IF
 
            ierr=NF90_OPEN(TRIM(fieldFile), NF90_NOWRITE, ncid)
@@ -346,6 +363,7 @@ MODULE mod_getfile
               CASE(3)
                   PRINT*,'ERROR:'
                   PRINT*,'The dimensions of variable ',TRIM(varName),' do not match'
+                  PRINT*,'in file', TRIM(fieldFile)
                   STOP
               CASE(4)
                   PRINT*,'ERROR:'

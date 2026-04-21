@@ -9,6 +9,8 @@ MODULE mod_tracerf
   !!
   !!------------------------------------------------------------------------------
 
+  USE mod_grid, only: imt, jmt, km
+
   IMPLICIT NONE
 
   CONTAINS
@@ -71,6 +73,86 @@ MODULE mod_tracerf
            + (c0+(c1+c2*T68)*T68)*S*SQRT(S) + d0*S**2
 
   END FUNCTION thermo_dens0
+
+  FUNCTION thermo_dens0_teos10(T,S)
+  ! --------------------------------------------------
+  !
+  ! Purpose:
+  ! Compute sigma 0 density
+  !
+  ! Method:
+  ! Compute the sigma 0 density using the TEOS-10 
+  ! equation of state
+  !
+  ! --------------------------------------------------
+    IMPLICIT NONE
+
+    REAL, INTENT(IN)                         :: T(:,:,:)      ! Conservative  T [degC]
+    REAL, INTENT(IN)                         :: S(:,:,:)      ! Absolute S [g/kg]
+    INTEGER                                  :: nx, ny, nz    ! Size of array
+    INTEGER                                  :: ii, ij, ik    ! Dummy indices
+    REAL                                     :: zt, zs, zn0   ! Dummy t,s and density
+    REAL, ALLOCATABLE, DIMENSION (:,:,:)     :: thermo_dens0_teos10
+
+    REAL, PARAMETER                          :: r1_T0 = 1./40.
+    REAL, PARAMETER                          :: r1_S0 = 0.875/35.16504
+    REAL, PARAMETER                          :: rdeltaS = 32.0
+    REAL, PARAMETER                          :: EOS000 = 8.0189615746e+02
+    REAL, PARAMETER                          :: EOS100 = 8.6672408165e+02
+    REAL, PARAMETER                          :: EOS200 = -1.7864682637e+03
+    REAL, PARAMETER                          :: EOS300 = 2.0375295546e+03
+    REAL, PARAMETER                          :: EOS400 = -1.2849161071e+03
+    REAL, PARAMETER                          :: EOS500 = 4.3227585684e+02
+    REAL, PARAMETER                          :: EOS600 = -6.0579916612e+01
+    REAL, PARAMETER                          :: EOS010 = 2.6010145068e+01
+    REAL, PARAMETER                          :: EOS110 = -6.5281885265e+01
+    REAL, PARAMETER                          :: EOS210 = 8.1770425108e+01
+    REAL, PARAMETER                          :: EOS310 = -5.6888046321e+01
+    REAL, PARAMETER                          :: EOS410 = 1.7681814114e+01
+    REAL, PARAMETER                          :: EOS510 = -1.9193502195
+    REAL, PARAMETER                          :: EOS020 = -3.7074170417e+01
+    REAL, PARAMETER                          :: EOS120 = 6.1548258127e+01
+    REAL, PARAMETER                          :: EOS220 = -6.0362551501e+01
+    REAL, PARAMETER                          :: EOS320 = 2.9130021253e+01
+    REAL, PARAMETER                          :: EOS420 = -5.4723692739
+    REAL, PARAMETER                          :: EOS030 = 2.1661789529e+01
+    REAL, PARAMETER                          :: EOS130 = -3.3449108469e+01
+    REAL, PARAMETER                          :: EOS230 = 1.9717078466e+01
+    REAL, PARAMETER                          :: EOS330 = -3.1742946532
+    REAL, PARAMETER                          :: EOS040 = -8.3627885467
+    REAL, PARAMETER                          :: EOS140 = 1.1311538584e+01
+    REAL, PARAMETER                          :: EOS240 = -5.3563304045
+    REAL, PARAMETER                          :: EOS050 = 5.4048723791e-01
+    REAL, PARAMETER                          :: EOS150 = 4.8169980163e-01
+    REAL, PARAMETER                          :: EOS060 = -1.9083568888e-01
+
+    ! Size of array
+    nx = SIZE(S,1); ny = SIZE(S,2); nz = SIZE(S,3);
+
+    ALLOCATE( thermo_dens0_teos10(nx,ny,nz) )
+
+    DO ik = 1,km
+      DO ij = 1,jmt
+        DO ii = 1, imt
+          !
+          zt = T(ii, ij, ik) * r1_T0
+          zs = SQRT( ABS( S(ii, ij, ik) + rdeltaS ) * r1_S0 )
+
+          zn0 = (((((EOS060*zt   &
+          &   + EOS150*zs+EOS050)*zt   &
+          &   + (EOS240*zs+EOS140)*zs+EOS040)*zt   &
+          &   + ((EOS330*zs+EOS230)*zs+EOS130)*zs+EOS030)*zt   &
+          &   + (((EOS420*zs+EOS320)*zs+EOS220)*zs+EOS120)*zs+EOS020)*zt   &
+          &   + ((((EOS510*zs+EOS410)*zs+EOS310)*zs+EOS210)*zs+EOS110)*zs+EOS010)*zt   &
+          &   + (((((EOS600*zs+EOS500)*zs+EOS400)*zs+EOS300)*zs+EOS200)*zs+EOS100)*zs+EOS000
+          !
+          thermo_dens0_teos10(ii,ij,ik) = zn0
+          
+        END DO
+      END DO
+    END DO
+
+  END FUNCTION thermo_dens0_teos10
 
   FUNCTION thermo_pt2ct(T,S)
   ! --------------------------------------------------
