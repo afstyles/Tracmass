@@ -1,7 +1,10 @@
 #!/bin/bash
 
+# Shell script for identifying runs which fail, 
+# most likely because of simultaneous attempts to access model data
+
+# Specify OUTPUT directory for TRACMASS run
 export DIR=${SCRATCH}/ORCA025/OUTPUT/
-##export DIR=/gws/nopw/j04/bas_pog/astyles/ORCA025_fwd/
 
 export fail_list=($(grep -lir "ERROR:" ${DIR}/*/TRACMASS.*.out ))
 
@@ -16,6 +19,7 @@ do
    echo ${keystr}
    echo ${n} >> n_fail.out
 
+   # Resubmit failed experiments (comment out if you just wish for a list of failed experiments)
    sleep 3
    sbatch subm_script_template.${keystr}.sh
 done

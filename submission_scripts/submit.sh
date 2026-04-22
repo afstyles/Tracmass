@@ -13,6 +13,7 @@ export BENCHMARK=false   #Only compile and submit one executable
 echo "Project is:", ${PROJECT}
 echo "Case is:" ${CASE} 
 
+# Define the TRACMASS directory
 export TM_DIR="/home/users/afstyles/Tracmass"
 echo "Tracmass directory is: " ${TM_DIR}
 

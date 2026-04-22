@@ -140,7 +140,7 @@
       kst1           = 1,
       kst2           = 75,
       ! when seedtype = 2 or 3
-      seeddir        = '/gws/nopw/j04/bas_pog/astyles/DRAKKAR_SET/seeding/seeding_subsampled_3x398/',     ! directory for seed files +++SEEDDIR+++
+      seeddir        = '/gws/ssde/j25a/bas_pog/astyles/DRAKKAR_SET/seeding/seeding_subsampled_3x398/',     ! directory for seed files +++SEEDDIR+++
       seedfile       = '+++SEEDFILE+++',				     ! name of seed file
       
       ! when seedtype = 3

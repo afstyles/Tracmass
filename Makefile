@@ -54,7 +54,9 @@ LIB_DIR = $(shell nf-config --flibs)
 INC_DIR = $(shell nf-config --cflags)
 
 else
-# NCDF_ROOT = /apps/jasmin/jaspy/mambaforge_envs/jaspy3.10/mf-22.11.1-4/envs/jaspy3.10-mf-22.11.1-4-v20230718/
+
+# Add path to netcdf library
+# Below example is compatible with jaspy 3.12 (module load jaspy/3.12/v20250704 in terminal)
 NCDF_ROOT = /apps/jasmin/jaspy/miniforge_envs/jaspy3.12/mf3-25.3.0-3/envs/jaspy3.12-mf3-25.3.0-3-v20250704/
 LIB_DIR = -L$(NCDF_ROOT)/lib -lnetcdf -lnetcdff
 INC_DIR	= -I$(NCDF_ROOT)/include
